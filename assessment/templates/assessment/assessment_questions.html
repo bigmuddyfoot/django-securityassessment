@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assessment Questions</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            display: flex;
+            background: #F4F6F8;
+            color: #33373B;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #sidebar {
+            width: 250px;
+            background: #33373B;
+            padding: 15px;
+            height: 100vh;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #sidebar h5 {
+            font-weight: bold;
+            color: white;
+        }
+
+        #sidebar .nav-link {
+            color: #CBD5E1;
+        }
+
+        #sidebar .nav-item.active .nav-link {
+            color: #2DD4BF;
+            font-weight: bold;
+        }
+
+        #sidebar .nav-link:hover {
+            color: #FFFFFF;
+            text-decoration: none;
+        }
+
+        .progress-footer {
+            color: #CBD5E1;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        #main-content {
+            flex-grow: 1;
+            padding: 30px;
+            position: relative;
+        }
+
+        .form-control {
+            width: 70% !important;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .btn-primary {
+            background-color: #2DD4BF;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: #24b8a8;
+        }
+
+        .btn-secondary {
+            background-color: #6366F1;
+            border: none;
+        }
+
+        .btn-secondary:hover {
+            background-color: #4f52d6;
+        }
+
+        .button-footer {
+            position: fixed;
+            bottom: 70px;
+            width: calc(100% - 250px);
+            left: 250px;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 999;
+        }
+
+        .button-footer .btn {
+            padding: 10px 25px;
+            font-weight: bold;
+            border-radius: 8px;
+            min-width: 120px;
+        }
+
+        #help-drawer {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100%;
+            background: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            transition: right 0.3s ease-in-out;
+            overflow-y: auto;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        #help-drawer.open {
+            right: 0;
+        }
+
+        #help-btn {
+            position: fixed;
+            right: 10px;
+            top: 150px;
+            z-index: 1001;
+            color: white;
+        }
+
+        .modal-content {
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Left Sidebar for Categories -->
+<div id="sidebar">
+    <div>
+        <h5>Categories</h5>
+        <ul class="nav flex-column nav-section">
+            {% for cat in categories %}
+                <li class="nav-item {% if cat.id == question.category.id %}active{% endif %}">
+                    <a class="nav-link" href="?category={{ cat.id }}">{{ cat.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="progress-footer">
+        Question {{ current_question_number }} of {{ total_questions }}
+    </div>
+</div>
+
+<!-- Main Content -->
+<div id="main-content">
+    <h3>{{ assessment.customer.name }} - Question</h3>
+
+    {% if question %}
+        <form method="post" id="question-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>{{ question.text }}</label>
+                {% if question.question_type == 'yes_no' %}
+                    <select name="answer" class="form-control question-input">
+                        {% for option in question.standardized_inputs.all %}
+                            <option value="{{ option.text }}">{{ option.text }}</option>
+                        {% endfor %}
+                    </select>
+                    <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed..."></textarea>
+                {% elif question.question_type == 'multiple_choice' %}
+                    {% for option in question.options.all %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="answer_option" value="{{ option.id }}">
+                            <label class="form-check-label">{{ option.text }}</label>
+                        </div>
+                    {% endfor %}
+                    <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed..."></textarea>
+                {% elif question.question_type == 'input' %}
+                    <input type="text" name="answer_text" class="form-control question-input">
+                {% endif %}
+            </div>
+        </form>
+    {% else %}
+        <p>No more questions available.</p>
+    {% endif %}
+</div>
+
+<!-- Button Footer -->
+{% if question %}
+<div class="button-footer">
+    {% if previous_question_id %}
+        <a href="{% url 'assessment_questions' assessment.id %}?previous={{ previous_question_id }}" class="btn btn-secondary">Previous</a>
+    {% else %}
+        <div></div> <!-- Placeholder for alignment if no previous -->
+    {% endif %}
+    <button type="submit" form="question-form" class="btn btn-primary">Next</button>
+</div>
+{% endif %}
+
+<!-- Help Button -->
+{% if question %}
+<button id="help-btn" class="btn btn-info">Need Help?</button>
+{% endif %}
+
+<!-- Help Drawer -->
+<div id="help-drawer">
+    <h4 class="p-3">Help & Resources <button id="close-help" class="btn btn-sm btn-danger float-right">X</button></h4>
+    <div class="p-3">
+        <p><strong>Explanation:</strong></p>
+        <div>{{ question.explanation_text|safe }}</div>
+
+        <p class="mt-3"><strong>Adtional Resources:</strong></p>
+        <ul>
+            {% if question.video %}
+                <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.video.file.url|default:question.video.external_link }}', 'video')">{{ question.video.name }}</a></li>
+            {% endif %}
+            {% if question.audio %}
+                <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.audio.file.url|default:question.audio.external_link }}', 'audio')">{{ question.audio.name }}</a></li>
+            {% endif %}
+            {% if question.pdf %}
+                <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.pdf.file.url|default:question.pdf.external_link }}', 'pdf')">{{ question.pdf.name }}</a></li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const helpBtn = document.getElementById('help-btn');
+        const helpDrawer = document.getElementById('help-drawer');
+        const closeHelp = document.getElementById('close-help');
+
+        if (helpBtn) {
+            helpBtn.addEventListener('click', function () {
+                helpDrawer.classList.add('open');
+                helpBtn.style.display = 'none';
+            });
+        }
+
+        if (closeHelp) {
+            closeHelp.addEventListener('click', function () {
+                helpDrawer.classList.remove('open');
+                helpBtn.style.display = 'block';
+            });
+        }
+    });
+
+    function openChildWindow(url, type) {
+        let features = "width=900,height=600,scrollbars=yes,resizable=yes";
+        let win = window.open(url, "_blank", features);
+        if (!win) alert("Please allow pop-ups for this site.");
+    }
+</script>
+
+</body>
+</html>

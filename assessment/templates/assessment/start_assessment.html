@@ -1,0 +1,18 @@
+{% extends 'assessment/base.html' %}
+
+{% block content %}
+<h2>Start or Continue Assessment</h2>
+
+Select an assessment from the list below to get started. <br><br>
+<form method="POST">
+    {% csrf_token %}
+    <label>Select Customer:</label>
+    <select name="customer" class="form-select mb-3" required>
+        {% for customer in customers %}
+            <option value="{{ customer.id }}">{{ customer.name }}</option>
+        {% endfor %}
+    </select>
+<br><br>
+    <button type="submit" class="btn btn-primary">Start Assessment</button>
+</form>
+{% endblock %}

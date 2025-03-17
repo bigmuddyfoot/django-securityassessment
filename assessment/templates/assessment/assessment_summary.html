@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assessment Summary</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            display: flex;
+            background: #F4F6F8;
+            color: #33373B;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #sidebar {
+            width: 250px;
+            background: #33373B;
+            padding: 15px;
+            height: 100vh;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+
+        #sidebar h5 {
+            font-weight: bold;
+            color: white;
+        }
+
+        #sidebar .nav-link {
+            color: #CBD5E1;
+        }
+
+        #sidebar .nav-link:hover {
+            color: #FFFFFF;
+        }
+
+        #main-content {
+            flex-grow: 1;
+            padding: 30px;
+        }
+
+        .question-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .question-card h5 {
+            margin-bottom: 15px;
+        }
+
+        .note {
+            background: #F0F4F8;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .score-box {
+            background: #2DD4BF;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Left Sidebar -->
+<div id="sidebar">
+    <div>
+        <h5>Assessment</h5>
+        <ul class="nav flex-column nav-section">
+            <li class="nav-item">
+                <a class="nav-link" href="#">Summary</a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div id="main-content">
+    <h3>{{ assessment.customer.name }} - Assessment Summary</h3>
+
+    <!-- Total Score -->
+    <div class="score-box">
+        Total Score: {{ assessment.score|default:"N/A" }}
+    </div>
+
+    <!-- Questions and Answers -->
+    {% for answer in user_answers %}
+        <div class="question-card">
+            <h5>Q: {{ answer.question.text }}</h5>
+
+            <p><strong>Answer:</strong>
+                {% if answer.answer_text %}
+                    {{ answer.answer_text }}
+                {% elif answer.selected_option %}
+                    {{ answer.selected_option.text }}
+                {% else %}
+                    No answer provided.
+                {% endif %}
+            </p>
+
+            {% if answer.note %}
+                <div class="note"><strong>Note:</strong> {{ answer.note }}</div>
+            {% endif %}
+        </div>
+    {% empty %}
+        <p>No answers have been provided yet.</p>
+    {% endfor %}
+
+</div>
+
+</body>
+</html>

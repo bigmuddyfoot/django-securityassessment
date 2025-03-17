@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Question Order</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background: #F4F6F8;
+            color: #33373B;
+            font-family: 'Arial', sans-serif;
+        }
+        .container {
+            margin-top: 40px;
+            margin-bottom: 100px;
+        }
+        .category-block {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        h3 {
+            margin-bottom: 20px;
+        }
+        .sortable-list {
+            list-style: none;
+            padding: 0;
+        }
+        .sortable-item {
+            padding: 10px 15px;
+            background: #fff;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: grab;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .btn-save {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 30px;
+            background: #2DD4BF;
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+        }
+        .btn-save:hover {
+            background: #24b8a8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Manage Question Order</h1>
+
+    {% for category in categories %}
+    <div class="category-block">
+        <h3>{{ category.name }}</h3>
+        <ul class="sortable-list" data-category-id="{{ category.id }}">
+            {% for question in category.question_set.all %}
+                <li class="sortable-item" data-id="{{ question.id }}">{{ question.text }}</li>
+            {% empty %}
+                <p>No questions in this category.</p>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+</div>
+
+<button class="btn-save" id="save-order-btn">Save Order</button>
+
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script>
+    $(function () {
+        // Make each list sortable
+        $(".sortable-list").sortable({
+            placeholder: "ui-state-highlight",
+            connectWith: false // prevent dragging between lists
+        }).disableSelection();
+
+        // Handle save button click
+        $('#save-order-btn').click(function () {
+            let data = {};
+
+            $('.sortable-list').each(function () {
+                const categoryId = $(this).data('category-id');
+                const questionOrder = [];
+
+                $(this).children('.sortable-item').each(function (index) {
+                    questionOrder.push({
+                        id: $(this).data('id'),
+                        order: index + 1
+                    });
+                });
+
+                data[categoryId] = questionOrder;
+            });
+
+            console.log('Sending data:', data);  // Debug check
+
+            fetch("{% url 'save_question_order' %}", {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Order saved successfully!');
+                } else {
+                    alert('Failed to save order. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error saving order.');
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
