@@ -1,45 +1,50 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.http import JsonResponse
-from django.db.models import Prefetch
-from .models import (
-    Question, Category, Product, Customer, Assessment,
-    QuestionOption, UserAnswer, StandardizedInput, HelpResource
-)
+from django.http import JsonResponse, HttpResponse
+from django.db.models import Prefetch, Sum
+import csv
 import json
+
+from .models import (
+    Question, Category, Customer, Assessment,
+    QuestionOption, UserAnswer
+)
+
 
 def home(request):
     return render(request, 'assessment/home.html')
 
 
-
-#  View to Manage Question Order (Drag and Drop)
-@login_required  # You can also use @staff_member_required for admin-only
+# 🚀 Manage Question Order (Drag and Drop)
+@login_required
 def manage_question_order(request):
     categories = Category.objects.prefetch_related(
         Prefetch('question_set', queryset=Question.objects.order_by('order'))
-    ).order_by('name')  # Adjust to 'order' if you want category ordering too
+    ).order_by('name')
 
     return render(request, 'assessment/manage_question_order.html', {'categories': categories})
 
 
-#  API to Save Question Order
+# 🚀 API to Save Question Order
 @require_POST
-@login_required  # You can also use @staff_member_required for admin-only
+@login_required
 def save_question_order(request):
-    data = json.loads(request.body)
+    try:
+        data = json.loads(request.body)
 
-    for category_id, questions in data.items():
-        for item in questions:
-            question_id = item['id']
-            new_order = item['order']
-            Question.objects.filter(id=question_id, category_id=category_id).update(order=new_order)
+        for category_id, questions in data.items():
+            for item in questions:
+                question_id = item['id']
+                new_order = item['order']
+                Question.objects.filter(id=question_id, category_id=category_id).update(order=new_order)
 
-    return JsonResponse({'status': 'success'})
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
-#  View to Start or Continue an Assessment
+# 🚀 Start or Continue an Assessment
 @login_required
 def start_assessment(request):
     customers = Customer.objects.all()
@@ -48,53 +53,48 @@ def start_assessment(request):
         customer_id = request.POST.get('customer')
         customer = get_object_or_404(Customer, id=customer_id)
 
-        # Check if an in-progress assessment already exists for this customer and employee
         assessment, created = Assessment.objects.get_or_create(
             customer=customer,
             employee=request.user,
             status='in_progress'
         )
 
-        # Redirect to the question flow for this assessment
         return redirect('assessment_questions', assessment_id=assessment.id)
 
     return render(request, 'assessment/start_assessment.html', {'customers': customers})
 
 
-#  View to Show and Answer Questions with Navigation and Category Filtering
+# 🚀 Display and Answer Questions
 @login_required
 def assessment_questions(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
 
-    # Handle navigation via query parameters
     selected_category_id = request.GET.get('category')
     previous_question_id = request.GET.get('previous')
 
-    # Questions already answered in this assessment
+    # Fetch previously answered questions
     answered_questions = UserAnswer.objects.filter(assessment=assessment).values_list('question_id', flat=True)
 
-    # Questions to filter (by category if selected)
+    # Get next unanswered question
     question_queryset = Question.objects.exclude(id__in=answered_questions).order_by('order')
     if selected_category_id:
         question_queryset = question_queryset.filter(category_id=selected_category_id)
 
-    # If going back to a previous question (for viewing/editing)
-    if previous_question_id:
-        question = get_object_or_404(Question, id=previous_question_id)
-    else:
-        question = question_queryset.first()
+    # Check if navigating back to a previous question
+    question = get_object_or_404(Question, id=previous_question_id) if previous_question_id else question_queryset.first()
 
-    #  Redirect to summary if no more questions are available
     if not question:
         return redirect('assessment_summary', assessment_id=assessment.id)
 
-    # Form submission to save current answer
-    if request.method == 'POST' and question:
+    # Fetch existing answer if available
+    existing_answer = UserAnswer.objects.filter(assessment=assessment, question=question).first()
+
+    if request.method == 'POST':
         answer_text = request.POST.get('answer_text', '')
         selected_option_id = request.POST.get('answer_option', None)
         note = request.POST.get('note', '')
 
-        # Avoid duplicate answer saves
+        # Save or update the answer
         UserAnswer.objects.update_or_create(
             assessment=assessment,
             question=question,
@@ -106,40 +106,81 @@ def assessment_questions(request, assessment_id):
         )
         return redirect('assessment_questions', assessment_id=assessment.id)
 
-    # All questions for total count/progress
-    total_questions = Question.objects.count()
-    answered_count = UserAnswer.objects.filter(assessment=assessment).count()
-    current_question_number = min(answered_count + 1, total_questions)  # ✅ Avoid over-counting
-
-    # All categories for left sidebar
-    categories = Category.objects.all()
-
-    # Fetch previous question id if available for back button
-    previous_answers = UserAnswer.objects.filter(assessment=assessment).order_by('-id')
-    previous_question = previous_answers.first().question if previous_answers.exists() else None
+    # Pre-fill selected answer
+    selected_answer = existing_answer.selected_option.id if existing_answer and existing_answer.selected_option else None
 
     context = {
         'assessment': assessment,
         'question': question,
-        'categories': categories,
-        'current_question_number': current_question_number,
-        'total_questions': total_questions,
-        'previous_question_id': previous_question.id if previous_question else None
+        'categories': Category.objects.all().order_by('order'),
+        'existing_answer': existing_answer,
+        'selected_answer': selected_answer,
+        'previous_question_id': previous_question_id if previous_question_id else None,
     }
 
     return render(request, 'assessment/assessment_questions.html', context)
 
 
-#  View to Show Assessment Summary when Complete
+# 🚀 Assessment Summary View
 @login_required
 def assessment_summary(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
-    # Gather data to show in the summary, e.g. user answers, scores, etc.
-    user_answers = UserAnswer.objects.filter(assessment=assessment)
-    # You might also calculate total scores, percentage correct, etc.
 
-    return render(request, 'assessment/assessment_summary.html', {
-        'assessment': assessment,
-        'user_answers': user_answers,
-        # Add any other summary data here
-    })
+    categorized_answers = {}
+    user_answers = UserAnswer.objects.filter(assessment=assessment).select_related('question', 'selected_option')
+
+    for answer in user_answers:
+        category = answer.question.category.name if answer.question.category else "Uncategorized"
+        if category not in categorized_answers:
+            categorized_answers[category] = []
+
+        # Ensure selected dropdown options are displayed properly
+        display_answer = (
+            answer.answer_text if answer.answer_text else
+            (answer.selected_option.text if answer.selected_option else "No answer provided")
+        )
+
+        categorized_answers[category].append({
+            "question": answer.question.text,
+            "answer": display_answer,
+            "note": answer.note if answer.note else "",
+        })
+
+    # Calculate total score (ensure numerical sum works)
+    total_score = (
+        UserAnswer.objects.filter(assessment=assessment)
+        .exclude(score__isnull=True)
+        .aggregate(total=Sum('score'))['total']
+    ) or "N/A"
+
+    context = {
+        "assessment": assessment,
+        "categorized_answers": categorized_answers,
+        "total_score": total_score,
+    }
+    return render(request, "assessment/assessment_summary.html", context)
+
+
+# 🚀 Export Assessment Summary as CSV
+@login_required
+def export_assessment_summary(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="Assessment_Summary_{assessment.customer.name}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(["Category", "Question", "Answer", "Notes"])
+
+    user_answers = UserAnswer.objects.filter(assessment=assessment).select_related('question', 'selected_option')
+
+    for answer in user_answers:
+        category = answer.question.category.name if answer.question.category else "Uncategorized"
+        display_answer = (
+            answer.answer_text if answer.answer_text else
+            (answer.selected_option.text if answer.selected_option else "No answer provided")
+        )
+
+        writer.writerow([category, answer.question.text, display_answer, answer.note if answer.note else ""])
+
+    return response

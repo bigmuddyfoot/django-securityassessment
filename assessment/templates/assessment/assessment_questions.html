@@ -117,24 +117,37 @@
         }
 
         #help-btn {
-            position: fixed;
-            right: 10px;
-            top: 150px;
-            z-index: 1001;
-            color: white;
-        }
+    writing-mode: vertical-rl; /* Rotates text vertically */
+    text-orientation: mixed; /* Keeps letters readable */
+    position: fixed;
+    right: 10px;
+    top: 150px;
+    z-index: 1001;
+    color: white;
+    background-color: #4d6f73; /* Adjust color */
+    padding: 10px 5px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    text-align: center;
+    height: auto;
+    white-space: nowrap;
+    transform: rotate(180deg); /* Flip text direction */
+}
+
 
         .modal-content {
             border-radius: 8px;
         }
     </style>
 </head>
+
 <body>
 
 <!-- Left Sidebar for Categories -->
 <div id="sidebar">
     <div>
-        <h5>Categories</h5>
+        <h5>Cybersecurty Assessment - <span id="year"></span> </h5>
         <ul class="nav flex-column nav-section">
             {% for cat in categories %}
                 <li class="nav-item {% if cat.id == question.category.id %}active{% endif %}">
@@ -153,30 +166,32 @@
     <h3>{{ assessment.customer.name }} - Question</h3>
 
     {% if question %}
-        <form method="post" id="question-form">
-            {% csrf_token %}
-            <div class="form-group">
-                <label>{{ question.text }}</label>
-                {% if question.question_type == 'yes_no' %}
-                    <select name="answer" class="form-control question-input">
-                        {% for option in question.standardized_inputs.all %}
-                            <option value="{{ option.text }}">{{ option.text }}</option>
-                        {% endfor %}
-                    </select>
-                    <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed..."></textarea>
-                {% elif question.question_type == 'multiple_choice' %}
+    <form method="post" id="question-form">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>{{ question.text }}</label>
+            
+            <!-- Dropdown for Multiple Choice -->
+            {% if question.options.all %}
+                <select name="answer_option" class="form-control question-input">
                     {% for option in question.options.all %}
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="answer_option" value="{{ option.id }}">
-                            <label class="form-check-label">{{ option.text }}</label>
-                        </div>
+                        <option value="{{ option.id }}" {% if selected_answer == option.id %}selected{% endif %}>
+                            {{ option.text }}
+                        </option>
                     {% endfor %}
-                    <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed..."></textarea>
-                {% elif question.question_type == 'input' %}
-                    <input type="text" name="answer_text" class="form-control question-input">
-                {% endif %}
-            </div>
-        </form>
+                </select>
+            {% else %}
+                <input type="text" name="answer_text" class="form-control" 
+                       value="{{ existing_answer.answer_text|default:'' }}" placeholder="Enter your answer">
+            {% endif %}
+            
+            <!-- Notes -->
+            <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">
+                {{ existing_answer.note|default:'' }}
+            </textarea>
+        </div>
+    </form>
+    
     {% else %}
         <p>No more questions available.</p>
     {% endif %}
@@ -209,11 +224,39 @@
         <p class="mt-3"><strong>Adtional Resources:</strong></p>
         <ul>
             {% if question.video %}
-                <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.video.file.url|default:question.video.external_link }}', 'video')">{{ question.video.name }}</a></li>
-            {% endif %}
-            {% if question.audio %}
-                <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.audio.file.url|default:question.audio.external_link }}', 'audio')">{{ question.audio.name }}</a></li>
-            {% endif %}
+   
+        {% if question.video.file %}
+        <li><a href="{{ question.video.file.url }}" target="_blank">View Now!</a></li>
+        {% endif %}
+        {% if question.video.external_link %}
+
+            <li><a href="{{ question.video.external_link }}" target="_blank">View Now!</a></li>
+        {% endif %}
+    
+{% endif %}
+
+{% if question.audio %}
+
+    {% if question.audio.file %}
+    <li> <a href="{{ question.audio.file.url }}" target="_blank">Listen Now!</a></li>
+    {% endif %}
+    {% if question.audio.external_link %}
+        <li>  <a href="{{ question.audio.external_link }}" target="_blank">Listen Now!</a></li>
+    {% endif %}
+
+{% endif %}
+
+{% if question.pdf %}
+
+    {% if question.pdf.file %}
+    <li><a href="{{ question.pdf.file.url }}" target="_blank">View PDF</a></li>
+    {% endif %}
+    {% if question.pdf.external_link %}
+        <li><a href="{{ question.pdf.external_link }}" target="_blank">View PDF</a></li>
+    {% endif %}
+
+{% endif %}
+
             {% if question.pdf %}
                 <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.pdf.file.url|default:question.pdf.external_link }}', 'pdf')">{{ question.pdf.name }}</a></li>
             {% endif %}
@@ -250,6 +293,12 @@
         if (!win) alert("Please allow pop-ups for this site.");
     }
 </script>
+
+<script>
+    // returns the current year
+    document.getElementById("year").innerHTML = new Date().getFullYear();
+ 
+    </script>
 
 </body>
 </html>

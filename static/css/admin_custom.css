@@ -1,0 +1,5 @@
+/* Make the drag handle column narrower */
+.drag.handle {
+    width: 20px !important;
+    text-align: center;
+}

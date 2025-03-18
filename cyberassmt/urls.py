@@ -1,33 +1,31 @@
-"""
-URL configuration for cyberassmt project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
 from django.urls import path, include
-
 from django.conf import settings
 from django.conf.urls.static import static
 
+# Import necessary views from assessment
+from assessment.views import (
+    assessment_summary,
+    assessment_questions,
+    start_assessment,
+    export_assessment_summary  # ✅ FIX: Import this view
+)
+
 urlpatterns = [
-    # Your existing URLs...
+    path('summary/<int:assessment_id>/', assessment_summary, name='assessment_summary'),
+    path('questions/<int:assessment_id>/', assessment_questions, name='assessment_questions'),
+    path('start/', start_assessment, name='start_assessment'),
+    path('summary/<int:assessment_id>/export/', export_assessment_summary, name='export_assessment_summary'),  # ✅ Fix: Now properly imported
+    
+    # Admin and authentication
     path('admin/', admin.site.urls),
-        path('assessment/', include('assessment.urls')),
-    path('accounts/', include('django.contrib.auth.urls')),  
-    path('', include('assessment.urls')),  # Assuming you include assessment urls
+    path('accounts/', include('django.contrib.auth.urls')),
+
+    # Include assessment app URLs
+    path('assessment/', include('assessment.urls')),
+    path('', include('assessment.urls')),
 ]
 
+# Serve media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

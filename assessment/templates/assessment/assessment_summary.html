@@ -69,6 +69,19 @@
             margin-bottom: 20px;
             text-align: center;
         }
+
+        .category-header {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+            margin-top: 20px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .export-btn {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -91,33 +104,44 @@
 
     <!-- Total Score -->
     <div class="score-box">
-        Total Score: {{ assessment.score|default:"N/A" }}
+        Total Score: {{ total_score|default:"N/A" }}
     </div>
 
-    <!-- Questions and Answers -->
-    {% for answer in user_answers %}
-        <div class="question-card">
-            <h5>Q: {{ answer.question.text }}</h5>
+    <!-- Export Button -->
+    <div class="export-btn">
+        <a href="{% url 'export_assessment_summary' assessment.id %}" class="btn btn-primary">
+            📥 Export Summary (CSV)
+        </a>
+    </div>
 
-            <p><strong>Answer:</strong>
-                {% if answer.answer_text %}
-                    {{ answer.answer_text }}
-                {% elif answer.selected_option %}
-                    {{ answer.selected_option.text }}
-                {% else %}
-                    No answer provided.
+    <!-- Questions Grouped by Categories -->
+    {% for category, answers in categorized_answers.items %}
+        <div class="category-header">{{ category }}</div>
+
+        {% for answer in answers %}
+            <div class="question-card">
+                <h5>Q: {{ answer.question.text }}</h5>
+
+                <p><strong>Answer:</strong>
+                    {% if answer.answer_text %}
+                        ✅ {{ answer.answer_text }}
+                    {% elif answer.selected_option %}
+                        ✅ {{ answer.selected_option.text }}
+                    {% else %}
+                        ❌ No answer provided.
+                    {% endif %}
+                </p>
+
+                {% if answer.note %}
+                    <div class="note"><strong>Notes:</strong> {{ answer.note }}</div>
                 {% endif %}
-            </p>
-
-            {% if answer.note %}
-                <div class="note"><strong>Note:</strong> {{ answer.note }}</div>
-            {% endif %}
-        </div>
+            </div>
+        {% endfor %}
     {% empty %}
         <p>No answers have been provided yet.</p>
     {% endfor %}
-
 </div>
+
 
 </body>
 </html>
