@@ -13,13 +13,27 @@ import csv
 import os
 
 from .models import (
-    Question, Category, Product, Customer, Assessment,
-    QuestionOption, UserAnswer, StandardizedInput, HelpResource, CSVUploadPlaceholder
+    Question, Category, Assessment, Customer,
+    StandardizedInput, Product, UserAnswer,
+    HelpResource, CSVUploadPlaceholder,
+    QuestionInputOption
 )
 
-# ---------- EXISTING QUESTION ADMIN ---------- #
 
-# Custom form for Question to use TinyMCE for explanation_text
+# ---------- INLINE FOR INPUT OPTIONS ---------- #
+class QuestionInputOptionInline(admin.TabularInline):
+    model = QuestionInputOption
+    extra = 0
+    fields = ('standardized_input', 'score_value', 'is_preferred')
+
+    def get_max_num(self, request, obj=None, **kwargs):
+        return None  # no limit
+
+    class Media:
+        js = ('js/admin_questioninputoption.js',)  # JavaScript to limit preferred checkbox
+
+
+# ---------- CUSTOM FORM FOR QUESTION ---------- #
 class QuestionAdminForm(forms.ModelForm):
     class Meta:
         model = Question
@@ -27,6 +41,7 @@ class QuestionAdminForm(forms.ModelForm):
         widgets = {
             'explanation_text': TinyMCE(attrs={'cols': 80, 'rows': 20}),
         }
+
 
 @admin.register(Question)
 class QuestionAdmin(SortableAdminMixin, admin.ModelAdmin):
@@ -37,6 +52,7 @@ class QuestionAdmin(SortableAdminMixin, admin.ModelAdmin):
     ordering = ('order',)
     search_fields = ['text']
     autocomplete_fields = ['video', 'audio', 'pdf', 'help_resources']
+    inlines = [QuestionInputOptionInline]
 
     def display_category(self, obj):
         return obj.category.name if obj.category else ""
@@ -46,11 +62,14 @@ class QuestionAdmin(SortableAdminMixin, admin.ModelAdmin):
         css = {
             'all': ('css/admin_custom.css',)
         }
+        js = ('js/admin_questioninputoption.js',)
+
+
 
 # ---------- CSV UPLOAD ADMIN TIED TO PLACEHOLDER ---------- #
-
 class CSVUploadForm(forms.Form):
     csv_file = forms.FileField(label='Select a CSV file to upload')
+
 
 @admin.register(CSVUploadPlaceholder)
 class CSVQuestionUploadAdmin(admin.ModelAdmin):
@@ -98,7 +117,7 @@ class CSVQuestionUploadAdmin(admin.ModelAdmin):
             form=form,
         )
         return TemplateResponse(request, "assessment/question_csv_upload.html", context)
-    
+
     def handle_csv_import(self, file_path):
         imported = 0
         categories_created = 0
@@ -146,12 +165,14 @@ class CSVQuestionUploadAdmin(admin.ModelAdmin):
 
         return imported, categories_created, inputs_created, errors
 
+
 # ---------- OTHER EXISTING ADMINS ---------- #
 
 @admin.register(Category)
 class CategoryAdmin(SortableAdminMixin, admin.ModelAdmin):
     list_display = ('name', 'order', 'description')
     ordering = ('order',)
+
 
 @admin.register(HelpResource)
 class HelpResourceAdmin(admin.ModelAdmin):
@@ -175,21 +196,26 @@ class HelpResourceAdmin(admin.ModelAdmin):
 class ProductAdmin(admin.ModelAdmin):
     list_display = ('name', 'item_number', 'unit_type', 'quantity_source_count_type')
 
+
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
     list_display = ('name', 'contact_email')
+
 
 @admin.register(Assessment)
 class AssessmentAdmin(admin.ModelAdmin):
     list_display = ('customer', 'employee', 'status', 'date_started', 'date_completed')
 
-@admin.register(QuestionOption)
-class QuestionOptionAdmin(admin.ModelAdmin):
-    list_display = ('question', 'text', 'score_value', 'flag_required')
+
+@admin.register(QuestionInputOption)
+class QuestionInputOptionAdmin(admin.ModelAdmin):
+    list_display = ('question', 'standardized_input', 'score_value', 'is_preferred')
+
 
 @admin.register(UserAnswer)
 class UserAnswerAdmin(admin.ModelAdmin):
     list_display = ('assessment', 'question', 'answer_text', 'selected_option', 'score', 'flag_required', 'date_answered')
+
 
 @admin.register(StandardizedInput)
 class StandardizedInputAdmin(admin.ModelAdmin):

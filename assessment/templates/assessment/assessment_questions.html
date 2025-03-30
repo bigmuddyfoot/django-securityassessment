@@ -1,3 +1,4 @@
+<!-- assessment_questions.html-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -149,12 +150,21 @@
     <div>
         <h5>Cybersecurty Assessment - <span id="year"></span> </h5>
         <ul class="nav flex-column nav-section">
-            {% for cat in categories %}
-                <li class="nav-item {% if cat.id == question.category.id %}active{% endif %}">
-                    <a class="nav-link" href="?category={{ cat.id }}">{{ cat.name }}</a>
+                   
+            <ul class="nav flex-column nav-section">
+                {% for cat in categories %}
+                    <li class="nav-item {% if cat.id == current_category.id %}active{% endif %}">
+                        <a class="nav-link" href="{% url 'assessment_questions' assessment.id cat.id %}">{{ cat.name }}</a>
+                    </li>
+                {% endfor %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'assessment_summary' assessment.id %}">
+                        📋 Assessment Summary
+                    </a>
                 </li>
-            {% endfor %}
-        </ul>
+            </ul>
+            
+                
     </div>
     <div class="progress-footer">
         Question {{ current_question_number }} of {{ total_questions }}
@@ -174,11 +184,14 @@
             {% if question.question_type == 'input' %}
                 <input type="text" name="answer_text" class="form-control" value="{{ existing_answer.answer_text|default:'' }}">
             {% elif question.question_type == 'multiple_choice' or question.question_type == 'yes_no' %}
-                <select name="answer_option" class="form-control">
-                    {% for option in question.standardized_inputs.all %}
-                        <option value="{{ option.id }}" {% if existing_answer.selected_option.id == option.id %}selected{% endif %}>{{ option.text }}</option>
-                    {% endfor %}
-                </select>
+            <select name="answer_option" class="form-control">
+                {% for option in question.input_options.all %}
+                    <option value="{{ option.standardized_input.id }}">
+                        {{ option.standardized_input.text }}
+                    </option>
+                {% endfor %}
+            </select>
+            
             {% endif %}
     
             <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">{{ existing_answer.note|default:'' }}</textarea>

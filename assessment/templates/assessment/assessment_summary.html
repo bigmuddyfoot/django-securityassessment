@@ -1,3 +1,5 @@
+<!-- assessment_summary -->
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,34 +17,36 @@
         #sidebar {
             width: 250px;
             background: #33373B;
-            padding: 15px;
+            padding: 20px;
             height: 100vh;
             overflow-y: auto;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
         }
         #sidebar h5 {
-            font-weight: bold;
-            color: white;
+            color: #fff;
+            margin-bottom: 15px;
         }
         #sidebar .nav-link {
             color: #CBD5E1;
         }
-        #sidebar .nav-link:hover {
-            color: #FFFFFF;
+        #sidebar .nav-link:hover, #sidebar .nav-link.active {
+            color: #fff;
+            font-weight: bold;
         }
         #main-content {
             flex-grow: 1;
             padding: 30px;
+            overflow-y: auto;
         }
         .question-card {
-            background: white;
+            background: #fff;
             padding: 20px;
             border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .question-card h5 {
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         .note {
             background: #F0F4F8;
@@ -52,78 +56,121 @@
         }
         .score-box {
             background: #2DD4BF;
-            color: white;
-            padding: 20px;
+            color: #fff;
+            padding: 15px;
             border-radius: 8px;
-            font-size: 1.2em;
-            font-weight: bold;
-            margin-bottom: 20px;
+            font-size: 1.4em;
             text-align: center;
+            margin-bottom: 20px;
         }
         .category-header {
-            font-size: 1.5em;
-            font-weight: bold;
+            font-size: 1.6em;
             color: #333;
-            margin-top: 20px;
-            padding-bottom: 5px;
             border-bottom: 2px solid #ddd;
+            margin-top: 30px;
+            margin-bottom: 15px;
         }
         .export-btn {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            max-width: 600px;
+            margin: 0 auto 40px;
         }
     </style>
 </head>
 <body>
 
-<!-- Left Sidebar -->
 <div id="sidebar">
-    <div>
-        <h5>Assessment</h5>
-        <ul class="nav flex-column nav-section">
-            <li class="nav-item">
-                <a class="nav-link" href="#">Summary</a>
-            </li>
-        </ul>
-    </div>
+    <h5>Assessment</h5>
+    <ul class="nav flex-column">
+        <li class="nav-item">
+            <a class="nav-link active" href="#">Summary</a>
+        </li>
+    </ul>
 </div>
 
-<!-- Main Content -->
 <div id="main-content">
-    <h3>{{ assessment.customer.name }} - Assessment Summary</h3>
+    <h2>{{ assessment.customer.name }} - Assessment Summary</h2>
 
-    <!-- Total Score -->
     <div class="score-box">
-        Total Score: {{ total_score|default:"N/A" }}
+        Total Score: {{ actual_score }} / {{ max_score }}
     </div>
 
-    <!-- Export Button -->
+    <div class="chart-container">
+        <canvas id="riskRadarChart"></canvas>
+    </div>
+<center>
+    <canvas id="riskGaugeChart" width="800" height="100"></canvas>
+</center>
     <div class="export-btn">
         <a href="{% url 'export_assessment_summary' assessment.id %}" class="btn btn-primary">
             📥 Export Summary (CSV)
         </a>
     </div>
-
-    <!-- Questions Grouped by Categories -->
     {% for category, answers in categorized_answers.items %}
         <div class="category-header">{{ category }}</div>
-
         {% for item in answers %}
             <div class="question-card">
                 <h5>Q: {{ item.question }}</h5>
-                <p><strong>Answer:</strong>
-                    {% if item.answer %}
-                        {{ item.answer }}
-                    {% else %}
-                        ❌ No answer provided.
-                    {% endif %}
+                <p>
+                    <strong>Answer:</strong>
+                    {{ item.answer|default:" No answer provided." }}
                 </p>
                 {% if item.note %}
-                    <div class="note"><strong>Notes:</strong> {{ item.note }}</div>
+                    <div class="note">
+                        <strong>Notes:</strong> {{ item.note }}
+                    </div>
                 {% endif %}
             </div>
         {% endfor %}
     {% endfor %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const radarCtx = document.getElementById('riskRadarChart').getContext('2d');
+    new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: {{ radar_labels_json|safe }},
+            datasets: [{
+                label: 'Risk Factors',
+                data: {{ radar_data_json|safe }},
+                backgroundColor: 'rgba(45, 212, 191, 0.4)',
+                borderColor: '#2DD4BF',
+                pointBackgroundColor: '#2DD4BF'
+            }]
+        },
+        options: {
+            scales: { r: { min: 0, max: 5, ticks: { display: false } } },
+            elements: { line: { tension: 0 }, point: { radius: 6 } },
+        }
+    });
+
+    const gaugeCanvas = document.getElementById('riskGaugeChart');
+    const ctx = gaugeCanvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, gaugeCanvas.width, 0);
+    gradient.addColorStop(0, '#22C55E');
+    gradient.addColorStop(0.33, '#EAB308');
+    gradient.addColorStop(0.66, '#F97316');
+    gradient.addColorStop(1, '#EF4444');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 40, gaugeCanvas.width, 20);
+    const pointerX = ({{ actual_score }} / {{ max_score }}) * gaugeCanvas.width;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.moveTo(pointerX, 35);
+    ctx.lineTo(pointerX - 8, 20);
+    ctx.lineTo(pointerX + 8, 20);
+    ctx.fill();
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('{{ actual_score }}', pointerX, 15);
+    ctx.fillStyle = '#333';
+    ctx.fillText('Low Risk', 10, 80);
+    ctx.textAlign = 'right';
+    ctx.fillText('Critical Risk', gaugeCanvas.width - 10, 80);
+</script>
 </body>
 </html>
