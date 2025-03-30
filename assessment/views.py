@@ -8,7 +8,7 @@ import json
 
 from .models import (
     Question, Category, Customer, Assessment,
-    QuestionOption, UserAnswer
+    QuestionOption, UserAnswer, StandardizedInput
 )
 
 
@@ -68,25 +68,27 @@ def start_assessment(request):
 @login_required
 def assessment_questions(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
-
     selected_category_id = request.GET.get('category')
     previous_question_id = request.GET.get('previous')
 
-    # Fetch previously answered questions
+    # Get the list of answered questions
     answered_questions = UserAnswer.objects.filter(assessment=assessment).values_list('question_id', flat=True)
 
-    # Get next unanswered question
+    # Determine the question to display
     question_queryset = Question.objects.exclude(id__in=answered_questions).order_by('order')
     if selected_category_id:
         question_queryset = question_queryset.filter(category_id=selected_category_id)
 
     # Check if navigating back to a previous question
-    question = get_object_or_404(Question, id=previous_question_id) if previous_question_id else question_queryset.first()
+    if previous_question_id:
+        question = get_object_or_404(Question.objects.prefetch_related('standardized_inputs'), id=previous_question_id)
+    else:
+        question = question_queryset.prefetch_related('standardized_inputs').first()
 
     if not question:
         return redirect('assessment_summary', assessment_id=assessment.id)
 
-    # Fetch existing answer if available
+    # Retrieve existing answer if available
     existing_answer = UserAnswer.objects.filter(assessment=assessment, question=question).first()
 
     if request.method == 'POST':
@@ -100,13 +102,13 @@ def assessment_questions(request, assessment_id):
             question=question,
             defaults={
                 'answer_text': answer_text,
-                'selected_option': QuestionOption.objects.filter(id=selected_option_id).first() if selected_option_id else None,
+                'selected_option': StandardizedInput.objects.filter(id=selected_option_id).first() if selected_option_id else None,
                 'note': note
             }
         )
         return redirect('assessment_questions', assessment_id=assessment.id)
 
-    # Pre-fill selected answer
+    # Ensure dropdown is pre-selected with the existing answer
     selected_answer = existing_answer.selected_option.id if existing_answer and existing_answer.selected_option else None
 
     context = {
@@ -116,6 +118,8 @@ def assessment_questions(request, assessment_id):
         'existing_answer': existing_answer,
         'selected_answer': selected_answer,
         'previous_question_id': previous_question_id if previous_question_id else None,
+        'current_question_number': answered_questions.count() + 1,
+        'total_questions': Question.objects.filter(category_id=selected_category_id).count() if selected_category_id else Question.objects.count()
     }
 
     return render(request, 'assessment/assessment_questions.html', context)
@@ -134,7 +138,6 @@ def assessment_summary(request, assessment_id):
         if category not in categorized_answers:
             categorized_answers[category] = []
 
-        # Ensure selected dropdown options are displayed properly
         display_answer = (
             answer.answer_text if answer.answer_text else
             (answer.selected_option.text if answer.selected_option else "No answer provided")
@@ -146,12 +149,7 @@ def assessment_summary(request, assessment_id):
             "note": answer.note if answer.note else "",
         })
 
-    # Calculate total score (ensure numerical sum works)
-    total_score = (
-        UserAnswer.objects.filter(assessment=assessment)
-        .exclude(score__isnull=True)
-        .aggregate(total=Sum('score'))['total']
-    ) or "N/A"
+    total_score = UserAnswer.objects.filter(assessment=assessment).aggregate(total=Sum('score'))['total'] or "N/A"
 
     context = {
         "assessment": assessment,

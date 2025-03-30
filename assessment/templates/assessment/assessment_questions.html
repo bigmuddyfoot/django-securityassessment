@@ -170,27 +170,21 @@
         {% csrf_token %}
         <div class="form-group">
             <label>{{ question.text }}</label>
-            
-            <!-- Dropdown for Multiple Choice -->
-            {% if question.options.all %}
-                <select name="answer_option" class="form-control question-input">
-                    {% for option in question.options.all %}
-                        <option value="{{ option.id }}" {% if selected_answer == option.id %}selected{% endif %}>
-                            {{ option.text }}
-                        </option>
+    
+            {% if question.question_type == 'input' %}
+                <input type="text" name="answer_text" class="form-control" value="{{ existing_answer.answer_text|default:'' }}">
+            {% elif question.question_type == 'multiple_choice' or question.question_type == 'yes_no' %}
+                <select name="answer_option" class="form-control">
+                    {% for option in question.standardized_inputs.all %}
+                        <option value="{{ option.id }}" {% if existing_answer.selected_option.id == option.id %}selected{% endif %}>{{ option.text }}</option>
                     {% endfor %}
                 </select>
-            {% else %}
-                <input type="text" name="answer_text" class="form-control" 
-                       value="{{ existing_answer.answer_text|default:'' }}" placeholder="Enter your answer">
             {% endif %}
-            
-            <!-- Notes -->
-            <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">
-                {{ existing_answer.note|default:'' }}
-            </textarea>
+    
+            <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">{{ existing_answer.note|default:'' }}</textarea>
         </div>
     </form>
+    
     
     {% else %}
         <p>No more questions available.</p>

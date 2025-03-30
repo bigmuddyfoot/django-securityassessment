@@ -45,7 +45,6 @@ class HelpResource(models.Model):
         return self.name
 
 
-
 class Category(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -221,7 +220,7 @@ class UserAnswer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     answer_text = models.TextField(blank=True, null=True)
     selected_option = models.ForeignKey(
-        QuestionOption, 
+        StandardizedInput, 
         on_delete=models.SET_NULL, 
         blank=True, 
         null=True
@@ -237,8 +236,6 @@ class UserAnswer(models.Model):
 
     def __str__(self):
         return f"Answer to {self.question.text[:50]} (Assessment #{self.assessment.id})"
-
-
 
 
 class CSVUploadPlaceholder(models.Model):

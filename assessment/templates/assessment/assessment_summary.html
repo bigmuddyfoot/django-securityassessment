@@ -12,7 +12,6 @@
             color: #33373B;
             font-family: 'Arial', sans-serif;
         }
-
         #sidebar {
             width: 250px;
             background: #33373B;
@@ -21,25 +20,20 @@
             overflow-y: auto;
             box-shadow: 2px 0 5px rgba(0,0,0,0.1);
         }
-
         #sidebar h5 {
             font-weight: bold;
             color: white;
         }
-
         #sidebar .nav-link {
             color: #CBD5E1;
         }
-
         #sidebar .nav-link:hover {
             color: #FFFFFF;
         }
-
         #main-content {
             flex-grow: 1;
             padding: 30px;
         }
-
         .question-card {
             background: white;
             padding: 20px;
@@ -47,18 +41,15 @@
             margin-bottom: 20px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-
         .question-card h5 {
             margin-bottom: 15px;
         }
-
         .note {
             background: #F0F4F8;
             padding: 10px;
             border-radius: 5px;
             margin-top: 10px;
         }
-
         .score-box {
             background: #2DD4BF;
             color: white;
@@ -69,7 +60,6 @@
             margin-bottom: 20px;
             text-align: center;
         }
-
         .category-header {
             font-size: 1.5em;
             font-weight: bold;
@@ -78,7 +68,6 @@
             padding-bottom: 5px;
             border-bottom: 2px solid #ddd;
         }
-
         .export-btn {
             margin-bottom: 20px;
         }
@@ -118,30 +107,23 @@
     {% for category, answers in categorized_answers.items %}
         <div class="category-header">{{ category }}</div>
 
-        {% for answer in answers %}
+        {% for item in answers %}
             <div class="question-card">
-                <h5>Q: {{ answer.question.text }}</h5>
-
+                <h5>Q: {{ item.question }}</h5>
                 <p><strong>Answer:</strong>
-                    {% if answer.answer_text %}
-                        ✅ {{ answer.answer_text }}
-                    {% elif answer.selected_option %}
-                        ✅ {{ answer.selected_option.text }}
+                    {% if item.answer %}
+                        {{ item.answer }}
                     {% else %}
                         ❌ No answer provided.
                     {% endif %}
                 </p>
-
-                {% if answer.note %}
-                    <div class="note"><strong>Notes:</strong> {{ answer.note }}</div>
+                {% if item.note %}
+                    <div class="note"><strong>Notes:</strong> {{ item.note }}</div>
                 {% endif %}
             </div>
         {% endfor %}
-    {% empty %}
-        <p>No answers have been provided yet.</p>
     {% endfor %}
 </div>
-
 
 </body>
 </html>
