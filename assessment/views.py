@@ -67,7 +67,14 @@ def assessment_questions(request, assessment_id, category_id=None):
     question = get_object_or_404(Question, id=previous_question_id) if previous_question_id else question_queryset.first()
 
     if not question:
-        return redirect('assessment_summary', assessment_id=assessment.id)
+        # Check if there are any remaining questions in ANY category
+        remaining_questions = Question.objects.exclude(id__in=answered_questions)
+        if not remaining_questions.exists():
+            return redirect('assessment_summary', assessment_id=assessment.id)
+        else:
+            # Redirect to first unanswered question in another category
+            first_remaining = remaining_questions.first()
+            return redirect('assessment_questions', assessment_id=assessment.id, category_id=first_remaining.category_id)
 
     existing_answer = UserAnswer.objects.filter(assessment=assessment, question=question).first()
 
@@ -85,7 +92,10 @@ def assessment_questions(request, assessment_id, category_id=None):
                 'note': note
             }
         )
-        return redirect('assessment_questions', assessment_id=assessment.id, category_id=category_id)
+        if category_id is not None:
+            return redirect('assessment_questions', assessment_id=assessment.id, category_id=category_id)
+        else:
+            return redirect('assessment_questions', assessment_id=assessment.id)
 
     selected_answer = existing_answer.selected_option.id if existing_answer and existing_answer.selected_option else None
 
@@ -95,7 +105,7 @@ def assessment_questions(request, assessment_id, category_id=None):
     context = {
         'assessment': assessment,
         'question': question,
-        'categories': Category.objects.all().order_by('order'),
+        'categories': Category.objects.filter(questions__isnull=False).distinct().order_by('order'),
         'existing_answer': existing_answer,
         'selected_answer': selected_answer,
         'previous_question_id': previous_question_id if previous_question_id else None,
@@ -104,7 +114,6 @@ def assessment_questions(request, assessment_id, category_id=None):
         'total_questions': total_questions,
     }
     return render(request, 'assessment/assessment_questions.html', context)
-
 
 
 # Assessment Summary View

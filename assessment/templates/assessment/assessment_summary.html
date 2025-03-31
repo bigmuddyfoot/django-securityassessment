@@ -93,15 +93,11 @@
 <div id="main-content">
     <h2>{{ assessment.customer.name }} - Assessment Summary</h2>
 
-    <div class="score-box">
-        Total Score: {{ actual_score }} / {{ max_score }}
-    </div>
-
     <div class="chart-container">
         <canvas id="riskRadarChart"></canvas>
     </div>
 <center>
-    <canvas id="riskGaugeChart" width="800" height="100"></canvas>
+    <canvas id="riskGaugeChart" width="1200" height="100"></canvas>
 </center>
     <div class="export-btn">
         <a href="{% url 'export_assessment_summary' assessment.id %}" class="btn btn-primary">
@@ -168,7 +164,7 @@
     ctx.textAlign = 'center';
     ctx.fillText('{{ actual_score }}', pointerX, 15);
     ctx.fillStyle = '#333';
-    ctx.fillText('Low Risk', 10, 80);
+    ctx.fillText('Low Risk', 30, 80);
     ctx.textAlign = 'right';
     ctx.fillText('Critical Risk', gaugeCanvas.width - 10, 80);
 </script>

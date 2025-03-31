@@ -180,23 +180,21 @@
         {% csrf_token %}
         <div class="form-group">
             <label>{{ question.text }}</label>
-    
-            {% if question.question_type == 'input' %}
-                <input type="text" name="answer_text" class="form-control" value="{{ existing_answer.answer_text|default:'' }}">
-            {% elif question.question_type == 'multiple_choice' or question.question_type == 'yes_no' %}
-            <select name="answer_option" class="form-control">
-                {% for option in question.input_options.all %}
-                    <option value="{{ option.standardized_input.id }}">
-                        {{ option.standardized_input.text }}
-                    </option>
-                {% endfor %}
-            </select>
-            
+            {% if question.question_type == "input" %}
+                <input type="text" name="answer_value" class="form-control" value="{{ answer_value|default_if_none:'' }}">
+            {% else %}
+                <select name="answer_option" class="form-control">
+                    {% for option in question.input_options.all %}
+                        <option value="{{ option.id }}" {% if selected_option_id == option.id %}selected{% endif %}>
+                            {{ option.standardized_input.text }}
+                        </option>
+                    {% endfor %}
+                </select>
             {% endif %}
-    
-            <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">{{ existing_answer.note|default:'' }}</textarea>
+            <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">{{ note }}</textarea>
         </div>
     </form>
+    
     
     
     {% else %}
