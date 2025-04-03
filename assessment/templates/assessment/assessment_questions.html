@@ -13,7 +13,6 @@
             color: #33373B;
             font-family: 'Arial', sans-serif;
         }
-
         #sidebar {
             width: 250px;
             background: #33373B;
@@ -21,66 +20,51 @@
             height: 100vh;
             overflow-y: auto;
             box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
         }
-
         #sidebar h5 {
             font-weight: bold;
             color: white;
         }
-
         #sidebar .nav-link {
             color: #CBD5E1;
         }
-
         #sidebar .nav-item.active .nav-link {
             color: #2DD4BF;
             font-weight: bold;
         }
-
         #sidebar .nav-link:hover {
             color: #FFFFFF;
             text-decoration: none;
         }
-
         .progress-footer {
             color: #CBD5E1;
             margin-top: 20px;
             font-weight: bold;
         }
-
         #main-content {
             flex-grow: 1;
             padding: 30px;
             position: relative;
         }
-
         .form-control {
             width: 70% !important;
             margin-bottom: 15px;
             border-radius: 8px;
         }
-
         .btn-primary {
             background-color: #2DD4BF;
             border: none;
         }
-
         .btn-primary:hover {
             background-color: #24b8a8;
         }
-
         .btn-secondary {
             background-color: #6366F1;
             border: none;
         }
-
         .btn-secondary:hover {
             background-color: #4f52d6;
         }
-
         .button-footer {
             position: fixed;
             bottom: 70px;
@@ -91,14 +75,12 @@
             padding: 0 20px;
             z-index: 999;
         }
-
         .button-footer .btn {
             padding: 10px 25px;
             font-weight: bold;
             border-radius: 8px;
             min-width: 120px;
         }
-
         #help-drawer {
             position: fixed;
             top: 0;
@@ -112,59 +94,48 @@
             z-index: 1000;
             padding: 20px;
         }
-
         #help-drawer.open {
             right: 0;
         }
-
         #help-btn {
-    writing-mode: vertical-rl; /* Rotates text vertically */
-    text-orientation: mixed; /* Keeps letters readable */
-    position: fixed;
-    right: 10px;
-    top: 150px;
-    z-index: 1001;
-    color: white;
-    background-color: #4d6f73; /* Adjust color */
-    padding: 10px 5px;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 16px;
-    text-align: center;
-    height: auto;
-    white-space: nowrap;
-    transform: rotate(180deg); /* Flip text direction */
-}
-
-
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            position: fixed;
+            right: 10px;
+            top: 150px;
+            z-index: 1001;
+            color: white;
+            background-color: #4d6f73;
+            padding: 10px 5px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+            height: auto;
+            white-space: nowrap;
+            transform: rotate(180deg);
+        }
         .modal-content {
             border-radius: 8px;
         }
     </style>
 </head>
-
 <body>
 
-<!-- Left Sidebar for Categories -->
+<!-- Sidebar -->
 <div id="sidebar">
     <div>
-        <h5>Cybersecurty Assessment - <span id="year"></span> </h5>
+        <h5>Cybersecurity Assessment - <span id="year"></span></h5>
         <ul class="nav flex-column nav-section">
-                   
-            <ul class="nav flex-column nav-section">
-                {% for cat in categories %}
-                    <li class="nav-item {% if cat.id == current_category.id %}active{% endif %}">
-                        <a class="nav-link" href="{% url 'assessment_questions' assessment.id cat.id %}">{{ cat.name }}</a>
-                    </li>
-                {% endfor %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'assessment_summary' assessment.id %}">
-                        📋 Assessment Summary
-                    </a>
+            {% for cat in categories %}
+                <li class="nav-item {% if current_category and cat.id == current_category.id %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'assessment_questions' assessment.id cat.id %}">{{ cat.name }}</a>
                 </li>
-            </ul>
-            
-                
+            {% endfor %}
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'assessment_summary' assessment.id %}">📋 Assessment Summary</a>
+            </li>
+        </ul>
     </div>
     <div class="progress-footer">
         Question {{ current_question_number }} of {{ total_questions }}
@@ -174,18 +145,16 @@
 <!-- Main Content -->
 <div id="main-content">
     <h3>{{ assessment.customer.name }} - Question</h3>
-
-    {% if question %}
     <form method="post" id="question-form">
         {% csrf_token %}
         <div class="form-group">
             <label>{{ question.text }}</label>
             {% if question.question_type == "input" %}
-                <input type="text" name="answer_value" class="form-control" value="{{ answer_value|default_if_none:'' }}">
+                <input type="text" name="answer_text" class="form-control" value="{{ answer_text }}">
             {% else %}
                 <select name="answer_option" class="form-control">
-                    {% for option in question.input_options.all %}
-                        <option value="{{ option.id }}" {% if selected_option_id == option.id %}selected{% endif %}>
+                    {% for option in input_options %}
+                        <option value="{{ option.standardized_input.id }}" {% if selected_answer == option.standardized_input.id %}selected{% endif %}>
                             {{ option.standardized_input.text }}
                         </option>
                     {% endfor %}
@@ -194,77 +163,26 @@
             <textarea name="note" class="form-control mt-2" placeholder="Add explanation if needed...">{{ note }}</textarea>
         </div>
     </form>
-    
-    
-    
-    {% else %}
-        <p>No more questions available.</p>
-    {% endif %}
+    <div class="button-footer">
+        <!-- Add a Previous button if needed -->
+        <div></div>
+        <button type="submit" form="question-form" class="btn btn-primary">Next</button>
+    </div>
 </div>
-
-<!-- Button Footer -->
-{% if question %}
-<div class="button-footer">
-    {% if previous_question_id %}
-        <a href="{% url 'assessment_questions' assessment.id %}?previous={{ previous_question_id }}" class="btn btn-secondary">Previous</a>
-    {% else %}
-        <div></div> <!-- Placeholder for alignment if no previous -->
-    {% endif %}
-    <button type="submit" form="question-form" class="btn btn-primary">Next</button>
-</div>
-{% endif %}
 
 <!-- Help Button -->
-{% if question %}
 <button id="help-btn" class="btn btn-info">Need Help?</button>
-{% endif %}
-
 <!-- Help Drawer -->
 <div id="help-drawer">
     <h4 class="p-3">Help & Resources <button id="close-help" class="btn btn-sm btn-danger float-right">X</button></h4>
     <div class="p-3">
         <p><strong>Explanation:</strong></p>
-        <div>{{ question.explanation_text|safe }}</div>
-
-        <p class="mt-3"><strong>Adtional Resources:</strong></p>
+        <div>{{ help_explanation|safe }}</div>
+        <p class="mt-3"><strong>Additional Resources:</strong></p>
         <ul>
-            {% if question.video %}
-   
-        {% if question.video.file %}
-        <li><a href="{{ question.video.file.url }}" target="_blank">View Now!</a></li>
-        {% endif %}
-        {% if question.video.external_link %}
-
-            <li><a href="{{ question.video.external_link }}" target="_blank">View Now!</a></li>
-        {% endif %}
-    
-{% endif %}
-
-{% if question.audio %}
-
-    {% if question.audio.file %}
-    <li> <a href="{{ question.audio.file.url }}" target="_blank">Listen Now!</a></li>
-    {% endif %}
-    {% if question.audio.external_link %}
-        <li>  <a href="{{ question.audio.external_link }}" target="_blank">Listen Now!</a></li>
-    {% endif %}
-
-{% endif %}
-
-{% if question.pdf %}
-
-    {% if question.pdf.file %}
-    <li><a href="{{ question.pdf.file.url }}" target="_blank">View PDF</a></li>
-    {% endif %}
-    {% if question.pdf.external_link %}
-        <li><a href="{{ question.pdf.external_link }}" target="_blank">View PDF</a></li>
-    {% endif %}
-
-{% endif %}
-
-            {% if question.pdf %}
-                <li><a href="#" onclick="openChildWindow('{{ request.scheme }}://{{ request.get_host }}{{ question.pdf.file.url|default:question.pdf.external_link }}', 'pdf')">{{ question.pdf.name }}</a></li>
-            {% endif %}
+            {% for resource in help_resources %}
+                <li><a href="{{ resource.url }}" target="_blank">{{ resource.title }}</a></li>
+            {% endfor %}
         </ul>
     </div>
 </div>
@@ -276,14 +194,12 @@
         const helpBtn = document.getElementById('help-btn');
         const helpDrawer = document.getElementById('help-drawer');
         const closeHelp = document.getElementById('close-help');
-
         if (helpBtn) {
             helpBtn.addEventListener('click', function () {
                 helpDrawer.classList.add('open');
                 helpBtn.style.display = 'none';
             });
         }
-
         if (closeHelp) {
             closeHelp.addEventListener('click', function () {
                 helpDrawer.classList.remove('open');
@@ -291,19 +207,7 @@
             });
         }
     });
-
-    function openChildWindow(url, type) {
-        let features = "width=900,height=600,scrollbars=yes,resizable=yes";
-        let win = window.open(url, "_blank", features);
-        if (!win) alert("Please allow pop-ups for this site.");
-    }
-</script>
-
-<script>
-    // returns the current year
     document.getElementById("year").innerHTML = new Date().getFullYear();
- 
-    </script>
-
+</script>
 </body>
 </html>

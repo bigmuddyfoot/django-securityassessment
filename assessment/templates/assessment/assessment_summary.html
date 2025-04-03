@@ -77,6 +77,13 @@
             max-width: 600px;
             margin: 0 auto 40px;
         }
+        /* Reduced font size for the gauge explanation text */
+        .gauge-text {
+            text-align: center;
+            font-size: 0.8em;
+            margin-top: 10px;
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -93,12 +100,24 @@
 <div id="main-content">
     <h2>{{ assessment.customer.name }} - Assessment Summary</h2>
 
-    <div class="chart-container">
-        <canvas id="riskRadarChart"></canvas>
+    <!-- Updated layout: side by side with right graph centered vertically -->
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <div class="chart-container">
+                <canvas id="riskRadarChart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6 d-flex flex-column align-items-center justify-content-center">
+            <div class="chart-container">
+                <canvas id="riskGaugeChart" width="500" height="100"></canvas>
+                <p class="gauge-text">
+                    This percentage represents your risk—lower values suggest reduced risk, <br>
+                    while higher values indicate increased risk. A score near 0 reflects a <br>smaller attack surface, lowering the chance of a cyber attack.
+                </p>
+            </div>
+        </div>
     </div>
-<center>
-    <canvas id="riskGaugeChart" width="1200" height="100"></canvas>
-</center>
+
     <div class="export-btn">
         <a href="{% url 'export_assessment_summary' assessment.id %}" class="btn btn-primary">
             📥 Export Summary (CSV)
@@ -139,13 +158,15 @@
             }]
         },
         options: {
-            scales: { r: { min: 0, max: 5, ticks: { display: false } } },
+            scales: { r: { min: 0, max: 20, ticks: { display: false } } },
             elements: { line: { tension: 0 }, point: { radius: 6 } },
         }
     });
 
     const gaugeCanvas = document.getElementById('riskGaugeChart');
     const ctx = gaugeCanvas.getContext('2d');
+
+    // Create the gradient for the gauge background.
     const gradient = ctx.createLinearGradient(0, 0, gaugeCanvas.width, 0);
     gradient.addColorStop(0, '#22C55E');
     gradient.addColorStop(0.33, '#EAB308');
@@ -153,17 +174,40 @@
     gradient.addColorStop(1, '#EF4444');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 40, gaugeCanvas.width, 20);
-    const pointerX = ({{ actual_score }} / {{ max_score }}) * gaugeCanvas.width;
+
+    // Parse float values from template variables
+    const actualScore = parseFloat("{{ actual_score }}") || 0;
+    const maxScore = parseFloat("{{ max_score }}") || 1;
+
+    // Calculate ratio & percentage, capped at 100
+    const rawRatio = actualScore / maxScore;
+    const percentage = Math.min(rawRatio * 100, 100);
+
+    // Convert that percentage to a pointer X position
+    let pointerX = (percentage / 100) * gaugeCanvas.width;
+
+    // Clamp pointerX so the triangle stays fully on the canvas
+    const pointerMargin = 8;  // half the width of your triangle
+    pointerX = Math.max(pointerX, pointerMargin);
+    pointerX = Math.min(pointerX, gaugeCanvas.width - pointerMargin);
+
+    // Draw the pointer as a small triangle
     ctx.fillStyle = '#000';
     ctx.beginPath();
     ctx.moveTo(pointerX, 35);
     ctx.lineTo(pointerX - 8, 20);
     ctx.lineTo(pointerX + 8, 20);
+    ctx.closePath();
     ctx.fill();
+
+    // Draw the text label for the pointer (percentage)
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('{{ actual_score }}', pointerX, 15);
+    ctx.fillText(percentage.toFixed(0) + '%', pointerX, 15);
+
+    // Draw the "Low Risk" and "Critical Risk" labels
     ctx.fillStyle = '#333';
+    ctx.textAlign = 'left';
     ctx.fillText('Low Risk', 30, 80);
     ctx.textAlign = 'right';
     ctx.fillText('Critical Risk', gaugeCanvas.width - 10, 80);

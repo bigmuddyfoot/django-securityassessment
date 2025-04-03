@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Prefetch, Sum
+from django.db.models import Prefetch
 import csv
 import json
 from django.utils.safestring import mark_safe
@@ -60,7 +60,6 @@ def assessment_questions(request, assessment_id, category_id=None):
 
     answered_questions = UserAnswer.objects.filter(assessment=assessment).values_list('question_id', flat=True)
     question_queryset = Question.objects.exclude(id__in=answered_questions).order_by('order')
-
     if category_id:
         question_queryset = question_queryset.filter(category_id=category_id)
 
@@ -79,8 +78,16 @@ def assessment_questions(request, assessment_id, category_id=None):
     existing_answer = UserAnswer.objects.filter(assessment=assessment, question=question).first()
 
     if request.method == 'POST':
-        answer_text = request.POST.get('answer_text', '')
-        selected_option_id = request.POST.get('answer_option', None)
+        if question.question_type == "input":
+            # For input-type questions, ignore user's numeric input and use question.weight.
+            answer_text = request.POST.get('answer_text', '')
+            selected_option = None
+        else:
+            # For multiple-choice questions, retrieve the selected option.
+            answer_text = ""
+            selected_option_id = request.POST.get('answer_option', None)
+            selected_option = StandardizedInput.objects.filter(id=selected_option_id).first() if selected_option_id else None
+
         note = request.POST.get('note', '')
 
         UserAnswer.objects.update_or_create(
@@ -88,7 +95,7 @@ def assessment_questions(request, assessment_id, category_id=None):
             question=question,
             defaults={
                 'answer_text': answer_text,
-                'selected_option': StandardizedInput.objects.filter(id=selected_option_id).first() if selected_option_id else None,
+                'selected_option': selected_option,
                 'note': note
             }
         )
@@ -98,9 +105,17 @@ def assessment_questions(request, assessment_id, category_id=None):
             return redirect('assessment_questions', assessment_id=assessment.id)
 
     selected_answer = existing_answer.selected_option.id if existing_answer and existing_answer.selected_option else None
+    answer_text = existing_answer.answer_text if existing_answer else ""
+    note = existing_answer.note if existing_answer and existing_answer.note else ""
 
-    total_questions = Question.objects.filter(category_id=category_id).count()
-    current_question_number = UserAnswer.objects.filter(assessment=assessment, question__category_id=category_id).count() + 1
+    # For non-input questions, pull the related input options.
+    if question.question_type != "input":
+        input_options = question.input_options.all()
+    else:
+        input_options = []
+
+    total_questions = Question.objects.filter(category_id=category_id).count() if category_id else Question.objects.count()
+    current_question_number = (UserAnswer.objects.filter(assessment=assessment, question__category_id=category_id).count() + 1) if category_id else (UserAnswer.objects.filter(assessment=assessment).count() + 1)
 
     context = {
         'assessment': assessment,
@@ -112,15 +127,15 @@ def assessment_questions(request, assessment_id, category_id=None):
         'current_category': Category.objects.get(id=category_id) if category_id else None,
         'current_question_number': current_question_number,
         'total_questions': total_questions,
+        'input_options': input_options,
+        'answer_text': answer_text,
+        'note': note,
     }
     return render(request, 'assessment/assessment_questions.html', context)
 
-
-# Assessment Summary View
 @login_required
 def assessment_summary(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
-
     categorized_answers = {}
     category_scores = {}
     user_answers = UserAnswer.objects.filter(assessment=assessment).select_related('question', 'selected_option')
@@ -130,23 +145,6 @@ def assessment_summary(request, assessment_id):
 
     for answer in user_answers:
         question = answer.question
-        weight = question.weight or 0
-        max_score += weight
-
-        is_preferred = True
-        if answer.selected_option:
-            try:
-                qio = QuestionInputOption.objects.get(
-                    question=question,
-                    standardized_input=answer.selected_option
-                )
-                if not qio.is_preferred:
-                    is_preferred = False
-                    actual_score += weight
-            except QuestionInputOption.DoesNotExist:
-                is_preferred = False
-                actual_score += weight
-
         category = question.category.name if question.category else "Uncategorized"
 
         if category not in categorized_answers:
@@ -154,13 +152,38 @@ def assessment_summary(request, assessment_id):
         if category not in category_scores:
             category_scores[category] = 0
 
-        if not is_preferred:
-            category_scores[category] += weight
+        # For non-input questions, use the score_value of the chosen option.
+        if answer.selected_option:
+            try:
+                qio = QuestionInputOption.objects.get(
+                    question=question,
+                    standardized_input=answer.selected_option
+                )
+                # If score_value is not defined, fallback to question.weight.
+                score = qio.score_value if qio.score_value is not None else (question.weight or 0)
+            except QuestionInputOption.DoesNotExist:
+                score = question.weight or 0
+        else:
+            # For input-type questions, ignore user's input and use question.weight.
+            score = question.weight or 0
 
-        display_answer = (
-            answer.answer_text if answer.answer_text else
-            (answer.selected_option.text if answer.selected_option else "No answer provided")
-        )
+        actual_score += score
+        category_scores[category] += score
+
+        # Determine the maximum possible score for this question from its input options.
+        if question.input_options.exists():
+            max_qio = question.input_options.order_by('-score_value').first()
+            max_question = max_qio.score_value if (max_qio and max_qio.score_value is not None) else (question.weight or 0)
+        else:
+            max_question = question.weight or 0
+        max_score += max_question
+
+        if answer.answer_text:
+            display_answer = answer.answer_text
+        elif answer.selected_option:
+            display_answer = answer.selected_option.text
+        else:
+            display_answer = "No answer provided"
 
         categorized_answers[category].append({
             "question": question.text,
@@ -168,10 +191,22 @@ def assessment_summary(request, assessment_id):
             "note": answer.note if answer.note else "",
         })
 
-    radar_data = list(category_scores.values())
-    radar_labels = list(category_scores.keys())  # Pull category names here dynamically
+    # Normalize category scores for the radar chart.
+    desired_radar_max = 20  # Desired maximum for the chart scale.
+    if category_scores:
+        max_cat_score = max(category_scores.values())
+        if max_cat_score == 0:
+            normalized_category_scores = {cat: 0 for cat in category_scores}
+        else:
+            normalized_category_scores = {
+                cat: round((score / max_cat_score) * desired_radar_max) for cat, score in category_scores.items()
+            }
+    else:
+        normalized_category_scores = {}
+    normalized_radar_data = list(normalized_category_scores.values())
 
-    radar_data_json = json.dumps(radar_data)
+    radar_labels = list(category_scores.keys())
+    radar_data_json = json.dumps(normalized_radar_data)
     radar_labels_json = json.dumps(radar_labels)
 
     context = {
@@ -181,24 +216,19 @@ def assessment_summary(request, assessment_id):
         "max_score": max_score,
         "category_scores": category_scores,
         "radar_data_json": radar_data_json,
-        "radar_labels_json": radar_labels_json,  # Pass the labels to template
+        "radar_labels_json": radar_labels_json,
     }
-
     return render(request, "assessment/assessment_summary.html", context)
 
-# Export Assessment Summary as CSV
 @login_required
 def export_assessment_summary(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
-
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="Assessment_Summary_{assessment.customer.name}.csv"'
-
     writer = csv.writer(response)
     writer.writerow(["Category", "Question", "Answer", "Notes"])
 
     user_answers = UserAnswer.objects.filter(assessment=assessment).select_related('question', 'selected_option')
-
     for answer in user_answers:
         category = answer.question.category.name if answer.question.category else "Uncategorized"
         display_answer = (
@@ -206,5 +236,4 @@ def export_assessment_summary(request, assessment_id):
             (answer.selected_option.text if answer.selected_option else "No answer provided")
         )
         writer.writerow([category, answer.question.text, display_answer, answer.note if answer.note else ""])
-
     return response
